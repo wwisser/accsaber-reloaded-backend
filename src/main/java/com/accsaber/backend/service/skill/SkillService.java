@@ -5,8 +5,10 @@ import java.math.RoundingMode;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -59,8 +61,12 @@ public class SkillService {
 
         if (categoryCode == null || categoryCode.isBlank()) {
             List<UserCategorySkill> rows = skillRepository.findByUserIdActive(userId);
-            if (rows.isEmpty()) {
-                upsertAllForUser(userId);
+            List<Category> activeCategories = categoryRepository.findByActiveTrue();
+            if (rows.size() < activeCategories.size()) {
+                Set<UUID> present = rows.stream()
+                        .map(s -> s.getCategory().getId())
+                        .collect(Collectors.toSet());
+                repairMissingCategories(user, activeCategories, present);
                 rows = skillRepository.findByUserIdActive(userId);
             }
             return toResponse(user, rows);
@@ -70,7 +76,7 @@ public class SkillService {
         UserCategorySkill row = skillRepository
                 .findByUserIdAndCategoryId(userId, category.getId())
                 .orElseGet(() -> {
-                    upsertAllForUser(userId);
+                    upsertCategory(user, category);
                     return skillRepository.findByUserIdAndCategoryId(userId, category.getId())
                             .orElseThrow(() -> new ResourceNotFoundException("UserCategorySkill",
                                     userId + "/" + category.getCode()));
@@ -99,6 +105,10 @@ public class SkillService {
         if (category == null) {
             return;
         }
+        upsertCategory(user, category);
+    }
+
+    private void upsertCategory(User user, Category category) {
         if (OVERALL_CODE.equals(category.getCode())) {
             persistOverall(user, category);
         } else {
@@ -108,21 +118,23 @@ public class SkillService {
         }
     }
 
-    @Transactional
-    public void upsertAllForUser(Long userId) {
-        User user = userRepository.findByIdAndActiveTrue(userId).orElse(null);
-        if (user == null) {
-            return;
-        }
+    private void repairMissingCategories(User user, List<Category> activeCategories,
+            Set<UUID> presentCategoryIds) {
         Category overall = null;
-        for (Category c : categoryRepository.findByActiveTrue()) {
+        boolean overallMissing = false;
+        boolean filledNonOverall = false;
+        for (Category c : activeCategories) {
             if (OVERALL_CODE.equals(c.getCode())) {
                 overall = c;
-            } else {
+                overallMissing = !presentCategoryIds.contains(c.getId());
+                continue;
+            }
+            if (!presentCategoryIds.contains(c.getId())) {
                 persistSingle(user, c);
+                filledNonOverall = true;
             }
         }
-        if (overall != null) {
+        if (overall != null && (overallMissing || filledNonOverall)) {
             persistOverall(user, overall);
         }
     }
