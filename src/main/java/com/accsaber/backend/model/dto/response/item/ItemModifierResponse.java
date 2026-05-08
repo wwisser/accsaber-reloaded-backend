@@ -8,19 +8,12 @@ import lombok.Getter;
 
 @Getter
 @Builder
-public class ItemResponse {
+public class ItemModifierResponse {
 
     private UUID id;
-    private UUID typeId;
-    private String typeKey;
+    private String key;
     private String name;
     private String description;
-    private String iconUrl;
-    private Object value;
-    private String rarity;
-    private boolean tradeable;
-    private boolean visible;
     private boolean active;
-    private boolean deprecated;
     private Instant createdAt;
 }

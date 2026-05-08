@@ -12,6 +12,8 @@ import com.fasterxml.jackson.databind.JsonNode;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -56,6 +58,15 @@ public class Item {
     private JsonNode value;
 
     @Column(nullable = false)
+    @Enumerated(EnumType.STRING)
+    @Builder.Default
+    private ItemRarity rarity = ItemRarity.common;
+
+    @Column(name = "next_serial", nullable = false)
+    @Builder.Default
+    private Long nextSerial = 1L;
+
+    @Column(nullable = false)
     @Builder.Default
     private boolean tradeable = false;
 
@@ -66,6 +77,10 @@ public class Item {
     @Column(nullable = false)
     @Builder.Default
     private boolean active = true;
+
+    @Column(nullable = false)
+    @Builder.Default
+    private boolean deprecated = false;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)

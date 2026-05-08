@@ -15,4 +15,6 @@ public class AwardItemRequest {
     private UUID itemId;
 
     private String reason;
+
+    private String modifierKey;
 }

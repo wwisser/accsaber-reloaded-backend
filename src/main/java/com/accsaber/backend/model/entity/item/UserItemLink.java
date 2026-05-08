@@ -47,6 +47,13 @@ public class UserItemLink {
     @JoinColumn(name = "item_id", nullable = false)
     private Item item;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "modifier_id", nullable = false)
+    private ItemModifier modifier;
+
+    @Column(name = "serial_number")
+    private Long serialNumber;
+
     @Column(nullable = false)
     @Enumerated(EnumType.STRING)
     private ItemSource source;

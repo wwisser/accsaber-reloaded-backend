@@ -3,6 +3,8 @@ package com.accsaber.backend.model.dto.request.item;
 import java.util.Map;
 import java.util.UUID;
 
+import com.accsaber.backend.model.entity.item.ItemRarity;
+
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
@@ -20,6 +22,7 @@ public class CreateItemRequest {
     private String iconUrl;
     private Map<String, Object> value;
 
+    private ItemRarity rarity = ItemRarity.common;
     private boolean tradeable = false;
     private boolean visible = true;
 }

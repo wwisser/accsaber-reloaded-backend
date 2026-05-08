@@ -22,6 +22,7 @@ import com.accsaber.backend.model.dto.request.item.CreateItemRequest;
 import com.accsaber.backend.model.dto.request.item.CreateItemTypeRequest;
 import com.accsaber.backend.model.dto.request.item.UpdateItemRequest;
 import com.accsaber.backend.model.dto.request.item.UpdateItemTypeRequest;
+import com.accsaber.backend.model.dto.response.item.ItemModifierResponse;
 import com.accsaber.backend.model.dto.response.item.ItemResponse;
 import com.accsaber.backend.model.dto.response.item.ItemTypeResponse;
 import com.accsaber.backend.model.dto.response.item.UserItemResponse;
@@ -97,7 +98,7 @@ public class AdminItemController {
     @PostMapping("/items")
     public ResponseEntity<ItemResponse> createItem(@Valid @RequestBody CreateItemRequest req) {
         var item = itemService.create(req.getTypeId(), req.getName(), req.getDescription(),
-                req.getIconUrl(), req.getValue(), req.isTradeable(), req.isVisible());
+                req.getIconUrl(), req.getValue(), req.getRarity(), req.isTradeable(), req.isVisible());
         return ResponseEntity.status(HttpStatus.CREATED).body(ItemMapper.toItemResponse(item));
     }
 
@@ -106,7 +107,7 @@ public class AdminItemController {
     public ResponseEntity<ItemResponse> updateItem(@PathVariable UUID id,
             @RequestBody UpdateItemRequest req) {
         var item = itemService.update(id, req.getName(), req.getDescription(), req.getIconUrl(),
-                req.getValue(), req.getTradeable(), req.getVisible());
+                req.getValue(), req.getRarity(), req.getTradeable(), req.getVisible());
         return ResponseEntity.ok(ItemMapper.toItemResponse(item));
     }
 
@@ -123,13 +124,27 @@ public class AdminItemController {
         return ResponseEntity.ok(ItemMapper.toItemResponse(itemService.reactivate(id)));
     }
 
-    @Operation(summary = "Manually award an item to a user")
+    @Operation(summary = "Manually award an item to a user", description = "If modifierKey is omitted, the auto-resolver runs (founders for first 5 serials, seasonal chance, normal otherwise). If provided, that modifier is forced.")
     @PostMapping("/items/award")
     public ResponseEntity<UserItemResponse> award(@Valid @RequestBody AwardItemRequest req,
             @AuthenticationPrincipal StaffUserDetails staff) {
         var link = itemService.awardManual(req.getUserId(), req.getItemId(),
-                staff.getStaffUser(), req.getReason());
+                staff.getStaffUser(), req.getReason(), req.getModifierKey());
         return ResponseEntity.status(HttpStatus.CREATED).body(ItemMapper.toUserItemResponse(link));
+    }
+
+    @Operation(summary = "Mark an item as deprecated", description = "Blocks new awards of this item and reassigns every existing user_item_link of it to the 'vintage' modifier. One-way — to re-enable, an admin would need to manually edit the data.")
+    @PostMapping("/items/{id}/deprecate")
+    public ResponseEntity<ItemResponse> deprecateItem(@PathVariable UUID id) {
+        return ResponseEntity.ok(ItemMapper.toItemResponse(itemService.deprecate(id)));
+    }
+
+    @Operation(summary = "List all active item modifiers")
+    @GetMapping("/item-modifiers")
+    public ResponseEntity<List<ItemModifierResponse>> listModifiers() {
+        return ResponseEntity.ok(itemService.findAllActiveModifiers().stream()
+                .map(ItemMapper::toModifierResponse)
+                .toList());
     }
 
     @Operation(summary = "Revoke a user's item award (hard delete)", description = "Removes a user_item_link by id. If the user had this item equipped, the equipped slot is silently cleared. Pending trades for this link are cascade-deleted.")

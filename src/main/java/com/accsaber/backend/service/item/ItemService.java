@@ -18,11 +18,13 @@ import com.accsaber.backend.exception.ResourceNotFoundException;
 import com.accsaber.backend.exception.ValidationException;
 import com.accsaber.backend.model.dto.response.item.ItemResponse;
 import com.accsaber.backend.model.entity.item.Item;
+import com.accsaber.backend.model.entity.item.ItemModifier;
 import com.accsaber.backend.model.entity.item.ItemSource;
 import com.accsaber.backend.model.entity.item.ItemType;
 import com.accsaber.backend.model.entity.item.UserItemLink;
 import com.accsaber.backend.model.entity.staff.StaffUser;
 import com.accsaber.backend.model.entity.user.UserSettingKey;
+import com.accsaber.backend.repository.item.ItemModifierRepository;
 import com.accsaber.backend.repository.item.ItemRepository;
 import com.accsaber.backend.repository.item.UserItemLinkRepository;
 import com.accsaber.backend.repository.user.UserRepository;
@@ -46,6 +48,8 @@ public class ItemService {
     private final DuplicateUserService duplicateUserService;
     private final ItemTypeService itemTypeService;
     private final UserSettingsService userSettingsService;
+    private final ItemModifierRepository itemModifierRepository;
+    private final ModifierResolver modifierResolver;
 
     public List<Item> findAllVisible() {
         return itemRepository.findByActiveTrueAndVisibleTrue();
@@ -122,7 +126,8 @@ public class ItemService {
 
     @Transactional
     public Item create(UUID typeId, String name, String description, String iconUrl,
-            Object value, boolean tradeable, boolean visible) {
+            Object value, com.accsaber.backend.model.entity.item.ItemRarity rarity, boolean tradeable,
+            boolean visible) {
         ItemType type = itemTypeService.findByIdActive(typeId);
         Item item = Item.builder()
                 .type(type)
@@ -130,6 +135,7 @@ public class ItemService {
                 .description(description)
                 .iconUrl(iconUrl)
                 .value(toJsonNode(value))
+                .rarity(rarity != null ? rarity : com.accsaber.backend.model.entity.item.ItemRarity.common)
                 .tradeable(tradeable)
                 .visible(visible)
                 .build();
@@ -138,7 +144,8 @@ public class ItemService {
 
     @Transactional
     public Item update(UUID id, String name, String description, String iconUrl,
-            Object value, Boolean tradeable, Boolean visible) {
+            Object value, com.accsaber.backend.model.entity.item.ItemRarity rarity,
+            Boolean tradeable, Boolean visible) {
         Item item = itemRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Item", id));
         if (name != null)
@@ -149,11 +156,17 @@ public class ItemService {
             item.setIconUrl(iconUrl);
         if (value != null)
             item.setValue(toJsonNode(value));
+        if (rarity != null)
+            item.setRarity(rarity);
         if (tradeable != null)
             item.setTradeable(tradeable);
         if (visible != null)
             item.setVisible(visible);
         return itemRepository.save(item);
+    }
+
+    public List<ItemModifier> findAllActiveModifiers() {
+        return itemModifierRepository.findByActiveTrue();
     }
 
     @Transactional
@@ -190,16 +203,21 @@ public class ItemService {
             return;
 
         Item item = itemRepository.findByIdAndActiveTrue(itemId).orElse(null);
-        if (item == null)
+        if (item == null || item.isDeprecated())
             return;
 
         if (userItemLinkRepository.existsByUser_IdAndItem_IdAndSourceAndSourceId(resolved, itemId, source, sourceId)) {
             return;
         }
 
+        long serial = issueSerial(itemId);
+        ItemModifier modifier = loadModifier(modifierResolver.resolveAutoKey(serial));
+
         UserItemLink link = UserItemLink.builder()
                 .user(userRepository.getReferenceById(resolved))
                 .item(item)
+                .modifier(modifier)
+                .serialNumber(serial)
                 .source(source)
                 .sourceId(sourceId)
                 .reason(reason)
@@ -208,23 +226,59 @@ public class ItemService {
     }
 
     @Transactional
-    public UserItemLink awardManual(Long userId, UUID itemId, StaffUser staff, String reason) {
+    public UserItemLink awardManual(Long userId, UUID itemId, StaffUser staff, String reason, String modifierKey) {
         Long resolved = duplicateUserService.resolvePrimaryUserId(userId);
         if (!userRepository.existsById(resolved)) {
             throw new ResourceNotFoundException("User", userId);
         }
         Item item = itemRepository.findByIdAndActiveTrue(itemId)
                 .orElseThrow(() -> new ResourceNotFoundException("Item", itemId));
+        if (item.isDeprecated()) {
+            throw new ValidationException("itemId", "cannot award a deprecated item");
+        }
+
+        long serial = issueSerial(itemId);
+        String resolvedKey = modifierKey != null ? modifierKey : modifierResolver.resolveAutoKey(serial);
+        ItemModifier modifier = loadModifier(resolvedKey);
 
         UserItemLink link = UserItemLink.builder()
                 .user(userRepository.getReferenceById(resolved))
                 .item(item)
+                .modifier(modifier)
+                .serialNumber(serial)
                 .source(ItemSource.manual)
                 .sourceId(null)
                 .awardedBy(staff)
                 .reason(reason)
                 .build();
         return userItemLinkRepository.save(link);
+    }
+
+    @Transactional
+    public Item deprecate(UUID itemId) {
+        Item item = itemRepository.findById(itemId)
+                .orElseThrow(() -> new ResourceNotFoundException("Item", itemId));
+        if (item.isDeprecated())
+            return item;
+        item.setDeprecated(true);
+        itemRepository.save(item);
+        ItemModifier vintage = loadModifier(ItemModifier.VINTAGE);
+        userItemLinkRepository.reassignModifierByItem(itemId, vintage);
+        return item;
+    }
+
+    private long issueSerial(UUID itemId) {
+        Item locked = itemRepository.findByIdForUpdate(itemId)
+                .orElseThrow(() -> new ResourceNotFoundException("Item", itemId));
+        long issued = locked.getNextSerial();
+        locked.setNextSerial(issued + 1);
+        itemRepository.save(locked);
+        return issued;
+    }
+
+    private ItemModifier loadModifier(String key) {
+        return itemModifierRepository.findByKey(key)
+                .orElseThrow(() -> new ResourceNotFoundException("ItemModifier", key));
     }
 
     @Transactional

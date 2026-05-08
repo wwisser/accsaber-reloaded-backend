@@ -21,6 +21,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.accsaber.backend.exception.UnauthorizedException;
 import com.accsaber.backend.model.dto.request.item.EquipItemRequest;
+import com.accsaber.backend.model.dto.response.item.ItemModifierResponse;
 import com.accsaber.backend.model.dto.response.item.ItemResponse;
 import com.accsaber.backend.model.dto.response.item.ItemTypeResponse;
 import com.accsaber.backend.model.dto.response.item.UserItemResponse;
@@ -48,6 +49,14 @@ public class ItemController {
     public ResponseEntity<List<ItemTypeResponse>> listTypes() {
         return ResponseEntity.ok(itemTypeService.findAllActive().stream()
                 .map(ItemMapper::toTypeResponse)
+                .toList());
+    }
+
+    @Operation(summary = "List all active item modifiers")
+    @GetMapping("/item-modifiers")
+    public ResponseEntity<List<ItemModifierResponse>> listModifiers() {
+        return ResponseEntity.ok(itemService.findAllActiveModifiers().stream()
+                .map(ItemMapper::toModifierResponse)
                 .toList());
     }
 

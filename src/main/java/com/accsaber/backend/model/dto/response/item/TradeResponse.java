@@ -15,6 +15,8 @@ public class TradeResponse {
     private Long toUserId;
     private UUID userItemLinkId;
     private ItemResponse item;
+    private UserItemResponse.ModifierRef modifier;
+    private Long serialNumber;
     private String status;
     private String message;
     private Instant createdAt;
