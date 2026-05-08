@@ -23,12 +23,13 @@ import org.springframework.web.bind.annotation.RestController;
 import com.accsaber.backend.model.dto.request.milestone.ActivateMilestonesRequest;
 import com.accsaber.backend.model.dto.request.milestone.AddMapDifficultyLinksRequest;
 import com.accsaber.backend.model.dto.request.milestone.CreateMilestoneRequest;
-import com.accsaber.backend.model.dto.request.milestone.CreateMilestoneSetRequest;
 import com.accsaber.backend.model.dto.request.milestone.CreateMilestoneSetGroupRequest;
 import com.accsaber.backend.model.dto.request.milestone.CreateMilestoneSetLinkRequest;
+import com.accsaber.backend.model.dto.request.milestone.CreateMilestoneSetRequest;
 import com.accsaber.backend.model.dto.request.milestone.CreatePrerequisiteLinkRequest;
 import com.accsaber.backend.model.dto.request.milestone.UpdateMilestoneRequest;
 import com.accsaber.backend.model.dto.request.milestone.UpdateMilestoneSetLinkRequest;
+import com.accsaber.backend.model.dto.request.milestone.UpdateMilestoneSetRequest;
 import com.accsaber.backend.model.dto.request.milestone.UpdatePrerequisiteLinkRequest;
 import com.accsaber.backend.model.dto.response.milestone.MilestoneResponse;
 import com.accsaber.backend.model.dto.response.milestone.MilestoneSchemaResponse;
@@ -83,6 +84,13 @@ public class AdminMilestoneController {
     @PostMapping("/sets")
     public ResponseEntity<MilestoneSetResponse> createSet(@Valid @RequestBody CreateMilestoneSetRequest request) {
         return ResponseEntity.status(HttpStatus.CREATED).body(milestoneService.createSet(request));
+    }
+
+    @Operation(summary = "Update a milestone set")
+    @PutMapping("/sets/{id}")
+    public ResponseEntity<MilestoneSetResponse> updateSet(@PathVariable UUID id,
+            @Valid @RequestBody UpdateMilestoneSetRequest request) {
+        return ResponseEntity.ok(milestoneService.updateSet(id, request));
     }
 
     @Operation(summary = "Create a milestone")

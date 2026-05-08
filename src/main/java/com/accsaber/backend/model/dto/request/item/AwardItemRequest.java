@@ -1,4 +1,4 @@
-package com.accsaber.backend.model.dto.request.badge;
+package com.accsaber.backend.model.dto.request.item;
 
 import java.util.UUID;
 
@@ -6,13 +6,13 @@ import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
 @Data
-public class AwardBadgeRequest {
+public class AwardItemRequest {
 
     @NotNull
     private Long userId;
 
     @NotNull
-    private UUID badgeId;
+    private UUID itemId;
 
     private String reason;
 }

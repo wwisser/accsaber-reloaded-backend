@@ -1,4 +1,4 @@
-package com.accsaber.backend.model.dto.request.milestone;
+package com.accsaber.backend.model.dto.request.campaign;
 
 import java.math.BigDecimal;
 import java.util.UUID;
@@ -7,14 +7,16 @@ import jakarta.validation.constraints.NotBlank;
 import lombok.Data;
 
 @Data
-public class CreateMilestoneSetRequest {
+public class CreateCampaignMilestoneRequest {
 
     @NotBlank
     private String title;
 
     private String description;
 
-    private BigDecimal setBonusXp;
+    private String avatarUrl;
+
+    private BigDecimal xp;
 
     private UUID awardsItemId;
 }

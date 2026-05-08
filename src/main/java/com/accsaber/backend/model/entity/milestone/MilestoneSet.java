@@ -7,7 +7,7 @@ import java.util.UUID;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
-import com.accsaber.backend.model.entity.badge.Badge;
+import com.accsaber.backend.model.entity.item.Item;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -47,8 +47,8 @@ public class MilestoneSet {
     private BigDecimal setBonusXp = BigDecimal.ZERO;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "awards_badge_id")
-    private Badge awardsBadge;
+    @JoinColumn(name = "awards_item_id")
+    private Item awardsItem;
 
     @Column(nullable = false)
     @Builder.Default

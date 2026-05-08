@@ -47,7 +47,6 @@ import com.accsaber.backend.service.player.PlayerImportService;
 import com.accsaber.backend.service.skill.SkillService;
 import com.accsaber.backend.service.songsuggest.SongSuggestService;
 import com.accsaber.backend.service.stats.OverallStatisticsService;
-
 import com.accsaber.backend.service.stats.RankingService;
 import com.accsaber.backend.service.stats.StatisticsService;
 import com.accsaber.backend.util.PlatformScoreMapper;
@@ -80,6 +79,7 @@ public class ScoreImportService {
     private final DuplicateUserService duplicateUserService;
     private final SkillService skillService;
     private final SongSuggestService songSuggestService;
+    private final com.accsaber.backend.service.item.LevelUpAwardService levelUpAwardService;
 
     @Autowired
     @Qualifier("backfillExecutor")
@@ -553,13 +553,15 @@ public class ScoreImportService {
         for (java.util.Map.Entry<MapDifficulty, Set<Long>> e : imported.entrySet()) {
             MapDifficulty difficulty = e.getKey();
             Set<Long> users = e.getValue();
-            if (users.isEmpty()) continue;
+            if (users.isEmpty())
+                continue;
             UUID categoryId = difficulty.getCategory().getId();
             usersByCategory.computeIfAbsent(categoryId, k -> new HashSet<>()).addAll(users);
             allAffectedUsers.addAll(users);
             if (difficulty.getCategory().isCountForOverall()) {
                 anyOverall = true;
-                for (Long u : users) userTouchesOverall.put(u, Boolean.TRUE);
+                for (Long u : users)
+                    userTouchesOverall.put(u, Boolean.TRUE);
             }
         }
 
@@ -690,7 +692,7 @@ public class ScoreImportService {
 
         BigDecimal total = milestoneXp.add(setXp);
         if (total.compareTo(BigDecimal.ZERO) > 0) {
-            userRepository.addXp(userId, total);
+            levelUpAwardService.addXp(userId, total);
         }
     }
 

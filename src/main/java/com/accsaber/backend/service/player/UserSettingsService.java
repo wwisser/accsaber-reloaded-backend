@@ -73,6 +73,26 @@ public class UserSettingsService {
     }
 
     @Transactional
+    public void set(Long userId, UserSettingKey key, Object value) {
+        User user = userRepository.findByIdAndActiveTrue(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User", userId));
+        JsonNode node = MAPPER.valueToTree(value);
+        validate(key, node);
+        UserSetting existing = settingRepository.findByUser_IdAndKey(userId, key.key()).orElse(null);
+        if (existing == null) {
+            settingRepository.save(UserSetting.builder().user(user).key(key.key()).value(node).build());
+        } else {
+            existing.setValue(node);
+            settingRepository.save(existing);
+        }
+    }
+
+    @Transactional
+    public void clear(Long userId, UserSettingKey key) {
+        settingRepository.findByUser_IdAndKey(userId, key.key()).ifPresent(settingRepository::delete);
+    }
+
+    @Transactional
     public Map<String, Object> updateGroup(Long userId, String group, Map<String, Object> patch) {
         User user = userRepository.findByIdAndActiveTrue(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User", userId));
@@ -97,7 +117,8 @@ public class UserSettingsService {
     }
 
     private Object serializeForResponse(Object defaultValue) {
-        if (defaultValue == null) return null;
+        if (defaultValue == null)
+            return null;
         if (defaultValue instanceof Enum<?> e) {
             return MAPPER.convertValue(e, Object.class);
         }

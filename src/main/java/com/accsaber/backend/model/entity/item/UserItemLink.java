@@ -1,16 +1,18 @@
-package com.accsaber.backend.model.entity.campaign;
+package com.accsaber.backend.model.entity.item;
 
-import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
 
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
-import com.accsaber.backend.model.entity.item.Item;
+import com.accsaber.backend.model.entity.staff.StaffUser;
+import com.accsaber.backend.model.entity.user.User;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
@@ -25,41 +27,42 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 @Entity
-@Table(name = "campaign_milestones")
+@Table(name = "user_item_links")
 @Getter
 @Setter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class CampaignMilestone {
+public class UserItemLink {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "campaign_id", nullable = false)
-    private Campaign campaign;
-
-    @Column(nullable = false)
-    private String title;
-
-    private String description;
-
-    @Column(name = "avatar_url")
-    private String avatarUrl;
-
-    @Column(nullable = false, precision = 20, scale = 6)
-    @Builder.Default
-    private BigDecimal xp = BigDecimal.ZERO;
+    @JoinColumn(name = "user_id", nullable = false)
+    private User user;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "awards_item_id")
-    private Item awardsItem;
+    @JoinColumn(name = "item_id", nullable = false)
+    private Item item;
 
     @Column(nullable = false)
+    @Enumerated(EnumType.STRING)
+    private ItemSource source;
+
+    @Column(name = "source_id")
+    private String sourceId;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "awarded_by")
+    private StaffUser awardedBy;
+
+    @Column(name = "awarded_at", nullable = false)
     @Builder.Default
-    private boolean active = true;
+    private Instant awardedAt = Instant.now();
+
+    private String reason;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)

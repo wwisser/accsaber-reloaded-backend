@@ -1,24 +1,23 @@
-package com.accsaber.backend.model.dto.response.milestone;
+package com.accsaber.backend.model.dto.response.campaign;
 
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
-
-import com.fasterxml.jackson.annotation.JsonInclude;
 
 import lombok.Builder;
 import lombok.Getter;
 
 @Getter
 @Builder
-@JsonInclude(JsonInclude.Include.NON_NULL)
-public class MilestoneSetResponse {
+public class CampaignMilestoneResponse {
 
     private UUID id;
+    private UUID campaignId;
     private String title;
     private String description;
-    private BigDecimal setBonusXp;
+    private String avatarUrl;
+    private BigDecimal xp;
     private UUID awardsItemId;
+    private boolean active;
     private Instant createdAt;
-    private BigDecimal userCompletionPercentage;
 }

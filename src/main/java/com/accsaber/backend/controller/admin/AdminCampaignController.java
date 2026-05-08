@@ -1,10 +1,12 @@
 package com.accsaber.backend.controller.admin;
 
+import java.util.List;
 import java.util.UUID;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -13,9 +15,12 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import com.accsaber.backend.model.dto.request.campaign.AddCampaignMapRequest;
+import com.accsaber.backend.model.dto.request.campaign.CreateCampaignMilestoneRequest;
 import com.accsaber.backend.model.dto.request.campaign.CreateCampaignRequest;
+import com.accsaber.backend.model.dto.request.campaign.UpdateCampaignMilestoneRequest;
 import com.accsaber.backend.model.dto.request.campaign.UpdateCampaignRequest;
 import com.accsaber.backend.model.dto.response.campaign.CampaignMapResponse;
+import com.accsaber.backend.model.dto.response.campaign.CampaignMilestoneResponse;
 import com.accsaber.backend.model.dto.response.campaign.CampaignResponse;
 import com.accsaber.backend.service.campaign.CampaignService;
 
@@ -68,6 +73,36 @@ public class AdminCampaignController {
             @PathVariable UUID campaignId,
             @PathVariable UUID campaignMapId) {
         campaignService.removeCampaignMap(campaignId, campaignMapId);
+        return ResponseEntity.noContent().build();
+    }
+
+    @Operation(summary = "List campaign milestones")
+    @GetMapping("/{campaignId}/milestones")
+    public ResponseEntity<List<CampaignMilestoneResponse>> listMilestones(@PathVariable UUID campaignId) {
+        return ResponseEntity.ok(campaignService.findActiveMilestonesByCampaign(campaignId));
+    }
+
+    @Operation(summary = "Create a campaign milestone")
+    @PostMapping("/{campaignId}/milestones")
+    public ResponseEntity<CampaignMilestoneResponse> createMilestone(
+            @PathVariable UUID campaignId,
+            @Valid @RequestBody CreateCampaignMilestoneRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(campaignService.createMilestone(campaignId, request));
+    }
+
+    @Operation(summary = "Update a campaign milestone")
+    @PatchMapping("/milestones/{milestoneId}")
+    public ResponseEntity<CampaignMilestoneResponse> updateMilestone(
+            @PathVariable UUID milestoneId,
+            @Valid @RequestBody UpdateCampaignMilestoneRequest request) {
+        return ResponseEntity.ok(campaignService.updateMilestone(milestoneId, request));
+    }
+
+    @Operation(summary = "Deactivate a campaign milestone")
+    @PatchMapping("/milestones/{milestoneId}/deactivate")
+    public ResponseEntity<Void> deactivateMilestone(@PathVariable UUID milestoneId) {
+        campaignService.deactivateMilestone(milestoneId);
         return ResponseEntity.noContent().build();
     }
 }

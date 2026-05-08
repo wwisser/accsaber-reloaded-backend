@@ -47,4 +47,6 @@ public class CreateMilestoneRequest {
     private boolean blExclusive = false;
 
     private List<UUID> mapDifficultyIds;
+
+    private UUID awardsItemId;
 }

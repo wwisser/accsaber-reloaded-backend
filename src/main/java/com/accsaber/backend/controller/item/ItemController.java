@@ -1,0 +1,120 @@
+package com.accsaber.backend.controller.item;
+
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+import com.accsaber.backend.exception.UnauthorizedException;
+import com.accsaber.backend.model.dto.request.item.EquipItemRequest;
+import com.accsaber.backend.model.dto.response.item.ItemResponse;
+import com.accsaber.backend.model.dto.response.item.ItemTypeResponse;
+import com.accsaber.backend.model.dto.response.item.UserItemResponse;
+import com.accsaber.backend.security.PlayerUserDetails;
+import com.accsaber.backend.service.item.ItemMapper;
+import com.accsaber.backend.service.item.ItemService;
+import com.accsaber.backend.service.item.ItemTypeService;
+
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import lombok.RequiredArgsConstructor;
+
+@RestController
+@RequestMapping("/v1")
+@RequiredArgsConstructor
+@Tag(name = "Items")
+public class ItemController {
+
+    private final ItemService itemService;
+    private final ItemTypeService itemTypeService;
+
+    @Operation(summary = "List all visible item types")
+    @GetMapping("/item-types")
+    public ResponseEntity<List<ItemTypeResponse>> listTypes() {
+        return ResponseEntity.ok(itemTypeService.findAllActive().stream()
+                .map(ItemMapper::toTypeResponse)
+                .toList());
+    }
+
+    @Operation(summary = "List all visible items, optionally filtered by type")
+    @GetMapping("/items")
+    public ResponseEntity<List<ItemResponse>> listItems(@RequestParam(required = false) UUID typeId) {
+        var items = typeId == null
+                ? itemService.findAllVisible()
+                : itemService.findByType(typeId, false);
+        return ResponseEntity.ok(items.stream().map(ItemMapper::toItemResponse).toList());
+    }
+
+    @Operation(summary = "Get an item by id")
+    @GetMapping("/items/{id}")
+    public ResponseEntity<ItemResponse> getItem(@PathVariable UUID id) {
+        return ResponseEntity.ok(ItemMapper.toItemResponse(itemService.findById(id)));
+    }
+
+    @Operation(summary = "List a user's owned item collection")
+    @GetMapping("/users/{userId}/items")
+    public ResponseEntity<List<UserItemResponse>> getUserItems(
+            @PathVariable Long userId,
+            @RequestParam(required = false) String typeKey) {
+        var links = typeKey == null
+                ? itemService.findUserCollection(userId)
+                : itemService.findUserCollectionByType(userId, typeKey);
+        return ResponseEntity.ok(links.stream().map(ItemMapper::toUserItemResponse).toList());
+    }
+
+    @Operation(summary = "Get a user's equipped items, fully hydrated, keyed by type key")
+    @GetMapping("/users/{userId}/items/equipped")
+    public ResponseEntity<Map<String, ItemResponse>> getEquipped(@PathVariable Long userId) {
+        return ResponseEntity.ok(itemService.findEquippedHydrated(userId));
+    }
+
+    @Operation(summary = "Paginated user inventory with optional type filter and sorting", description = "Sortable fields: awardedAt, item.name, item.type.key. Default sort: awardedAt desc.")
+    @GetMapping("/users/{userId}/inventory")
+    public ResponseEntity<Page<UserItemResponse>> getInventory(
+            @PathVariable Long userId,
+            @RequestParam(required = false) String typeKey,
+            @PageableDefault(size = 50, sort = "awardedAt", direction = Sort.Direction.DESC) Pageable pageable) {
+        return ResponseEntity.ok(itemService.findInventory(userId, typeKey, pageable)
+                .map(ItemMapper::toUserItemResponse));
+    }
+
+    @Operation(summary = "Equip an owned item to its corresponding profile slot")
+    @PostMapping("/users/me/items/equip")
+    public ResponseEntity<Void> equip(
+            @Valid @RequestBody EquipItemRequest request,
+            @AuthenticationPrincipal PlayerUserDetails principal) {
+        itemService.equip(requirePrincipal(principal).getUserId(), request.getItemId());
+        return ResponseEntity.noContent().build();
+    }
+
+    @Operation(summary = "Clear the equipped item for a given item type")
+    @DeleteMapping("/users/me/items/equip/{typeKey}")
+    public ResponseEntity<Void> unequip(
+            @PathVariable String typeKey,
+            @AuthenticationPrincipal PlayerUserDetails principal) {
+        itemService.unequip(requirePrincipal(principal).getUserId(), typeKey);
+        return ResponseEntity.noContent().build();
+    }
+
+    private PlayerUserDetails requirePrincipal(PlayerUserDetails principal) {
+        if (principal == null) {
+            throw new UnauthorizedException("Player authentication required");
+        }
+        return principal;
+    }
+}

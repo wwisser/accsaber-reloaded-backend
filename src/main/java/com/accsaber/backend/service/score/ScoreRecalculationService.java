@@ -62,6 +62,7 @@ public class ScoreRecalculationService {
     private final UserCategoryStatisticsRepository userCategoryStatisticsRepository;
     private final ScoreRankingService scoreRankingService;
     private final SongSuggestService songSuggestService;
+    private final com.accsaber.backend.service.item.LevelUpAwardService levelUpAwardService;
 
     @Autowired
     @Qualifier("backfillExecutor")
@@ -393,7 +394,7 @@ public class ScoreRecalculationService {
 
         BigDecimal total = milestoneXp.add(setXp);
         if (total.compareTo(BigDecimal.ZERO) > 0) {
-            userRepository.addXp(userId, total);
+            levelUpAwardService.addXp(userId, total);
         }
     }
 }

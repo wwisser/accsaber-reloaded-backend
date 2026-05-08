@@ -15,6 +15,7 @@ import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.accsaber.backend.model.entity.item.ItemSource;
 import com.accsaber.backend.model.entity.milestone.Milestone;
 import com.accsaber.backend.model.entity.milestone.MilestoneSet;
 import com.accsaber.backend.model.entity.milestone.UserMilestoneLink;
@@ -25,7 +26,8 @@ import com.accsaber.backend.repository.milestone.MilestoneRepository;
 import com.accsaber.backend.repository.milestone.UserMilestoneLinkRepository;
 import com.accsaber.backend.repository.milestone.UserMilestoneSetBonusRepository;
 import com.accsaber.backend.repository.user.UserRepository;
-import com.accsaber.backend.service.badge.BadgeService;
+import com.accsaber.backend.service.item.ItemService;
+import com.accsaber.backend.service.item.LevelUpAwardService;
 
 import lombok.RequiredArgsConstructor;
 
@@ -38,7 +40,8 @@ public class MilestoneEvaluationService {
     private final UserMilestoneSetBonusRepository userMilestoneSetBonusRepository;
     private final UserRepository userRepository;
     private final MilestoneQueryBuilderService queryBuilderService;
-    private final BadgeService badgeService;
+    private final ItemService itemService;
+    private final LevelUpAwardService levelUpAwardService;
 
     public record EvaluationResult(List<Milestone> completedMilestones, List<MilestoneSet> completedSets) {
     }
@@ -82,6 +85,7 @@ public class MilestoneEvaluationService {
         }
 
         userMilestoneLinkRepository.saveAll(linksToSave);
+        awardMilestoneItems(userId, newlyCompleted);
 
         List<MilestoneSet> completedSets = claimEligibleSetBonuses(userId, newlyCompleted);
         return new EvaluationResult(newlyCompleted, completedSets);
@@ -119,6 +123,7 @@ public class MilestoneEvaluationService {
         userMilestoneLinkRepository.save(link);
 
         if (newlyCompleted) {
+            awardMilestoneItems(userId, List.of(milestone));
             BigDecimal xpToAward = milestone.getXp() != null ? milestone.getXp() : BigDecimal.ZERO;
             List<MilestoneSet> completedSets = claimEligibleSetBonuses(userId, List.of(milestone));
             for (MilestoneSet set : completedSets) {
@@ -170,13 +175,28 @@ public class MilestoneEvaluationService {
         }
 
         userMilestoneLinkRepository.saveAll(linksToSave);
+        awardMilestoneItems(userId, newlyCompleted);
 
         List<MilestoneSet> completedSets = claimEligibleSetBonuses(userId, newlyCompleted);
         return new EvaluationResult(newlyCompleted, completedSets);
     }
 
+    private void awardMilestoneItems(Long userId, List<Milestone> milestones) {
+        for (Milestone m : milestones) {
+            if (m.getAwardsItem() != null) {
+                itemService.awardSystem(
+                        userId,
+                        m.getAwardsItem().getId(),
+                        ItemSource.milestone,
+                        m.getId().toString(),
+                        "Completed milestone: " + m.getTitle());
+            }
+        }
+    }
+
     private BigDecimal evaluateMilestone(Milestone milestone, Long userId, UUID categoryId) {
-        if (milestone.getQuerySpec() == null) return null;
+        if (milestone.getQuerySpec() == null)
+            return null;
         return queryBuilderService.evaluate(milestone.getQuerySpec(), userId, categoryId);
     }
 
@@ -240,8 +260,12 @@ public class MilestoneEvaluationService {
                     .claimedAt(Instant.now())
                     .build());
 
-            if (set.getAwardsBadge() != null) {
-                badgeService.awardBadgeSystem(userId, set.getAwardsBadge().getId(),
+            if (set.getAwardsItem() != null) {
+                itemService.awardSystem(
+                        userId,
+                        set.getAwardsItem().getId(),
+                        ItemSource.milestone_set,
+                        set.getId().toString(),
                         "Completed milestone set: " + set.getTitle());
             }
 
@@ -253,8 +277,10 @@ public class MilestoneEvaluationService {
 
     private void awardXp(Long userId, BigDecimal xp) {
         User user = userRepository.findById(userId).orElseThrow();
-        user.setTotalXp(user.getTotalXp().add(xp));
+        BigDecimal oldXp = user.getTotalXp();
+        user.setTotalXp(oldXp.add(xp));
         userRepository.save(user);
+        levelUpAwardService.processLevelUps(userId, oldXp, xp);
     }
 
     private boolean isCompleted(Milestone milestone, BigDecimal currentValue) {

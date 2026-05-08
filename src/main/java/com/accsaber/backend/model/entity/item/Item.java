@@ -1,13 +1,14 @@
-package com.accsaber.backend.model.entity.campaign;
+package com.accsaber.backend.model.entity.item;
 
-import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
 
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.annotations.UpdateTimestamp;
+import org.hibernate.type.SqlTypes;
 
-import com.accsaber.backend.model.entity.item.Item;
+import com.fasterxml.jackson.databind.JsonNode;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -18,6 +19,7 @@ import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
@@ -25,37 +27,41 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 @Entity
-@Table(name = "campaign_milestones")
+@Table(name = "items", uniqueConstraints = @UniqueConstraint(columnNames = { "type_id", "name" }))
 @Getter
 @Setter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class CampaignMilestone {
+public class Item {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private UUID id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "campaign_id", nullable = false)
-    private Campaign campaign;
+    @JoinColumn(name = "type_id", nullable = false)
+    private ItemType type;
 
     @Column(nullable = false)
-    private String title;
+    private String name;
 
     private String description;
 
-    @Column(name = "avatar_url")
-    private String avatarUrl;
+    @Column(name = "icon_url")
+    private String iconUrl;
 
-    @Column(nullable = false, precision = 20, scale = 6)
+    @Column(columnDefinition = "jsonb")
+    @JdbcTypeCode(SqlTypes.JSON)
+    private JsonNode value;
+
+    @Column(nullable = false)
     @Builder.Default
-    private BigDecimal xp = BigDecimal.ZERO;
+    private boolean tradeable = false;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "awards_item_id")
-    private Item awardsItem;
+    @Column(nullable = false)
+    @Builder.Default
+    private boolean visible = true;
 
     @Column(nullable = false)
     @Builder.Default

@@ -19,22 +19,28 @@ import org.springframework.transaction.annotation.Transactional;
 import com.accsaber.backend.exception.ResourceNotFoundException;
 import com.accsaber.backend.exception.ValidationException;
 import com.accsaber.backend.model.dto.request.campaign.AddCampaignMapRequest;
+import com.accsaber.backend.model.dto.request.campaign.CreateCampaignMilestoneRequest;
 import com.accsaber.backend.model.dto.request.campaign.CreateCampaignRequest;
+import com.accsaber.backend.model.dto.request.campaign.UpdateCampaignMilestoneRequest;
 import com.accsaber.backend.model.dto.request.campaign.UpdateCampaignRequest;
 import com.accsaber.backend.model.dto.response.campaign.CampaignDetailResponse;
 import com.accsaber.backend.model.dto.response.campaign.CampaignMapProgressResponse;
 import com.accsaber.backend.model.dto.response.campaign.CampaignMapResponse;
+import com.accsaber.backend.model.dto.response.campaign.CampaignMilestoneResponse;
 import com.accsaber.backend.model.dto.response.campaign.CampaignProgressResponse;
 import com.accsaber.backend.model.dto.response.campaign.CampaignResponse;
 import com.accsaber.backend.model.entity.campaign.Campaign;
 import com.accsaber.backend.model.entity.campaign.CampaignMap;
 import com.accsaber.backend.model.entity.campaign.CampaignMapPath;
+import com.accsaber.backend.model.entity.campaign.CampaignMilestone;
 import com.accsaber.backend.model.entity.map.MapDifficulty;
 import com.accsaber.backend.model.entity.score.Score;
 import com.accsaber.backend.model.entity.user.User;
 import com.accsaber.backend.repository.campaign.CampaignMapPathRepository;
 import com.accsaber.backend.repository.campaign.CampaignMapRepository;
+import com.accsaber.backend.repository.campaign.CampaignMilestoneRepository;
 import com.accsaber.backend.repository.campaign.CampaignRepository;
+import com.accsaber.backend.repository.item.ItemRepository;
 import com.accsaber.backend.repository.map.MapDifficultyRepository;
 import com.accsaber.backend.repository.score.ScoreRepository;
 import com.accsaber.backend.repository.user.UserRepository;
@@ -54,6 +60,8 @@ public class CampaignService {
         private final UserRepository userRepository;
         private final MapDifficultyRepository mapDifficultyRepository;
         private final DuplicateUserService duplicateUserService;
+        private final CampaignMilestoneRepository campaignMilestoneRepository;
+        private final ItemRepository itemRepository;
 
         public Page<CampaignResponse> findAllActiveCampaigns(Pageable pageable) {
                 return campaignRepository.findByActiveTrue(pageable)
@@ -305,6 +313,73 @@ public class CampaignService {
                                 .accuracyRequirement(cm.getAccuracyRequirement())
                                 .xp(cm.getXp())
                                 .prerequisiteMapIds(prerequisiteMapIds)
+                                .build();
+        }
+
+        public List<CampaignMilestoneResponse> findActiveMilestonesByCampaign(UUID campaignId) {
+                return campaignMilestoneRepository.findByCampaign_IdAndActiveTrue(campaignId).stream()
+                                .map(CampaignService::toCampaignMilestoneResponse)
+                                .toList();
+        }
+
+        @Transactional
+        public CampaignMilestoneResponse createMilestone(UUID campaignId, CreateCampaignMilestoneRequest request) {
+                Campaign campaign = campaignRepository.findByIdAndActiveTrue(campaignId)
+                                .orElseThrow(() -> new ResourceNotFoundException("Campaign", campaignId));
+                CampaignMilestone milestone = CampaignMilestone.builder()
+                                .campaign(campaign)
+                                .title(request.getTitle())
+                                .description(request.getDescription())
+                                .avatarUrl(request.getAvatarUrl())
+                                .xp(request.getXp() != null ? request.getXp() : BigDecimal.ZERO)
+                                .awardsItem(loadItem(request.getAwardsItemId()))
+                                .build();
+                return toCampaignMilestoneResponse(campaignMilestoneRepository.save(milestone));
+        }
+
+        @Transactional
+        public CampaignMilestoneResponse updateMilestone(UUID milestoneId, UpdateCampaignMilestoneRequest request) {
+                CampaignMilestone milestone = campaignMilestoneRepository.findByIdAndActiveTrue(milestoneId)
+                                .orElseThrow(() -> new ResourceNotFoundException("CampaignMilestone", milestoneId));
+                if (request.getTitle() != null)
+                        milestone.setTitle(request.getTitle());
+                if (request.getDescription() != null)
+                        milestone.setDescription(request.getDescription());
+                if (request.getAvatarUrl() != null)
+                        milestone.setAvatarUrl(request.getAvatarUrl());
+                if (request.getXp() != null)
+                        milestone.setXp(request.getXp());
+                if (request.getAwardsItemId() != null)
+                        milestone.setAwardsItem(loadItem(request.getAwardsItemId()));
+                return toCampaignMilestoneResponse(campaignMilestoneRepository.save(milestone));
+        }
+
+        @Transactional
+        public void deactivateMilestone(UUID milestoneId) {
+                CampaignMilestone milestone = campaignMilestoneRepository.findById(milestoneId)
+                                .orElseThrow(() -> new ResourceNotFoundException("CampaignMilestone", milestoneId));
+                milestone.setActive(false);
+                campaignMilestoneRepository.save(milestone);
+        }
+
+        private com.accsaber.backend.model.entity.item.Item loadItem(UUID itemId) {
+                if (itemId == null)
+                        return null;
+                return itemRepository.findByIdAndActiveTrue(itemId)
+                                .orElseThrow(() -> new ResourceNotFoundException("Item", itemId));
+        }
+
+        private static CampaignMilestoneResponse toCampaignMilestoneResponse(CampaignMilestone m) {
+                return CampaignMilestoneResponse.builder()
+                                .id(m.getId())
+                                .campaignId(m.getCampaign().getId())
+                                .title(m.getTitle())
+                                .description(m.getDescription())
+                                .avatarUrl(m.getAvatarUrl())
+                                .xp(m.getXp())
+                                .awardsItemId(m.getAwardsItem() != null ? m.getAwardsItem().getId() : null)
+                                .active(m.isActive())
+                                .createdAt(m.getCreatedAt())
                                 .build();
         }
 }

@@ -8,10 +8,15 @@ import java.util.UUID;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import com.accsaber.backend.exception.ResourceNotFoundException;
+import com.accsaber.backend.model.dto.request.milestone.UpsertLevelThresholdRequest;
 import com.accsaber.backend.model.dto.response.milestone.LevelResponse;
+import com.accsaber.backend.model.dto.response.milestone.LevelThresholdResponse;
 import com.accsaber.backend.model.entity.Curve;
+import com.accsaber.backend.model.entity.item.Item;
 import com.accsaber.backend.model.entity.milestone.LevelThreshold;
 import com.accsaber.backend.repository.CurveRepository;
+import com.accsaber.backend.repository.item.ItemRepository;
 import com.accsaber.backend.repository.milestone.LevelThresholdRepository;
 
 import lombok.RequiredArgsConstructor;
@@ -25,6 +30,7 @@ public class LevelService {
 
     private final LevelThresholdRepository levelThresholdRepository;
     private final CurveRepository curveRepository;
+    private final ItemRepository itemRepository;
 
     private volatile Curve cachedLevelCurve;
     private final Object curveLock = new Object();
@@ -90,6 +96,52 @@ public class LevelService {
 
     public List<LevelThreshold> getAllThresholds() {
         return levelThresholdRepository.findAllByOrderByLevelAsc();
+    }
+
+    public List<LevelThresholdResponse> listThresholds() {
+        return levelThresholdRepository.findAllByOrderByLevelAsc().stream()
+                .map(LevelService::toResponse)
+                .toList();
+    }
+
+    public LevelThresholdResponse findThreshold(int level) {
+        return levelThresholdRepository.findById(level)
+                .map(LevelService::toResponse)
+                .orElseThrow(() -> new ResourceNotFoundException("LevelThreshold", level));
+    }
+
+    @Transactional
+    public LevelThresholdResponse upsertThreshold(int level, UpsertLevelThresholdRequest request) {
+        LevelThreshold threshold = levelThresholdRepository.findById(level)
+                .orElseGet(() -> LevelThreshold.builder().level(level).build());
+        threshold.setTitle(request.getTitle());
+        threshold.setAwardsItem(loadItem(request.getAwardsItemId()));
+        return toResponse(levelThresholdRepository.save(threshold));
+    }
+
+    @Transactional
+    public void deleteThreshold(int level) {
+        if (!levelThresholdRepository.existsById(level)) {
+            throw new ResourceNotFoundException("LevelThreshold", level);
+        }
+        levelThresholdRepository.deleteById(level);
+    }
+
+    private Item loadItem(UUID itemId) {
+        if (itemId == null)
+            return null;
+        return itemRepository.findByIdAndActiveTrue(itemId)
+                .orElseThrow(() -> new ResourceNotFoundException("Item", itemId));
+    }
+
+    private static LevelThresholdResponse toResponse(LevelThreshold t) {
+        return LevelThresholdResponse.builder()
+                .level(t.getLevel())
+                .title(t.getTitle())
+                .awardsItemId(t.getAwardsItem() != null ? t.getAwardsItem().getId() : null)
+                .createdAt(t.getCreatedAt())
+                .updatedAt(t.getUpdatedAt())
+                .build();
     }
 
     public void evictLevelCurveCache() {

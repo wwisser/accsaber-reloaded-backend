@@ -39,6 +39,7 @@ import com.accsaber.backend.repository.map.MapDifficultyRepository;
 import com.accsaber.backend.repository.score.ScoreModifierLinkRepository;
 import com.accsaber.backend.repository.score.ScoreRepository;
 import com.accsaber.backend.repository.user.UserRepository;
+import com.accsaber.backend.service.item.LevelUpAwardService;
 import com.accsaber.backend.service.map.MapDifficultyComplexityService;
 import com.accsaber.backend.service.map.MapDifficultyStatisticsService;
 import com.accsaber.backend.service.milestone.MilestoneEvaluationService;
@@ -72,6 +73,7 @@ public class ScoreService {
         private final ScoreRankingService scoreRankingService;
         private final DuplicateUserService duplicateUserService;
         private final com.accsaber.backend.service.skill.SkillService skillService;
+        private final LevelUpAwardService levelUpAwardService;
         private final ApplicationEventPublisher eventPublisher;
         private final TransactionTemplate transactionTemplate;
 
@@ -314,7 +316,7 @@ public class ScoreService {
                 scoreRepository.saveAndFlush(recalculated);
                 copyModifierLinks(score, recalculated);
                 if (oldXp.compareTo(BigDecimal.ZERO) > 0) {
-                        userRepository.addXp(score.getUser().getId(), oldXp.negate());
+                        levelUpAwardService.addXp(score.getUser().getId(), oldXp.negate());
                 }
 
                 return new RecalcResult(score.getUser().getId(), difficulty.getCategory().getId(), difficulty.getId());
@@ -386,7 +388,7 @@ public class ScoreService {
 
                 scoreRepository.saveAndFlush(recalculated);
                 copyModifierLinks(score, recalculated);
-                userRepository.addXp(score.getUser().getId(), newXpGained.subtract(oldXpGained));
+                levelUpAwardService.addXp(score.getUser().getId(), newXpGained.subtract(oldXpGained));
 
                 return score.getUser().getId();
         }
@@ -548,7 +550,7 @@ public class ScoreService {
         }
 
         private void updateUserXp(Long userId, BigDecimal xpGained) {
-                userRepository.addXp(userId, xpGained);
+                levelUpAwardService.addXp(userId, xpGained);
         }
 
         private void awardMilestoneXp(Long userId, MilestoneEvaluationService.EvaluationResult evaluation) {

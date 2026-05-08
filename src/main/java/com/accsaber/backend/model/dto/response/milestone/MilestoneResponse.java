@@ -29,5 +29,6 @@ public class MilestoneResponse {
     private BigDecimal completionPercentage;
     private Long completions;
     private Long totalPlayers;
+    private UUID awardsItemId;
     private Instant createdAt;
 }

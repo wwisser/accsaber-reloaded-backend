@@ -19,9 +19,9 @@ import org.springframework.transaction.annotation.Transactional;
 import com.accsaber.backend.exception.ConflictException;
 import com.accsaber.backend.exception.ResourceNotFoundException;
 import com.accsaber.backend.model.dto.request.milestone.CreateMilestoneRequest;
-import com.accsaber.backend.model.dto.request.milestone.CreateMilestoneSetRequest;
 import com.accsaber.backend.model.dto.request.milestone.CreateMilestoneSetGroupRequest;
 import com.accsaber.backend.model.dto.request.milestone.CreateMilestoneSetLinkRequest;
+import com.accsaber.backend.model.dto.request.milestone.CreateMilestoneSetRequest;
 import com.accsaber.backend.model.dto.request.milestone.CreatePrerequisiteLinkRequest;
 import com.accsaber.backend.model.dto.request.milestone.UpdateMilestoneSetLinkRequest;
 import com.accsaber.backend.model.dto.request.milestone.UpdatePrerequisiteLinkRequest;
@@ -48,6 +48,7 @@ import com.accsaber.backend.model.entity.milestone.UserMilestoneLink;
 import com.accsaber.backend.model.entity.score.Score;
 import com.accsaber.backend.model.entity.user.User;
 import com.accsaber.backend.repository.CategoryRepository;
+import com.accsaber.backend.repository.item.ItemRepository;
 import com.accsaber.backend.repository.map.MapDifficultyMilestoneLinkRepository;
 import com.accsaber.backend.repository.map.MapDifficultyRepository;
 import com.accsaber.backend.repository.milestone.MilestoneCompletionStatsRepository;
@@ -83,6 +84,8 @@ public class MilestoneService {
     private final MilestoneEvaluationService milestoneEvaluationService;
     private final MilestoneQueryBuilderService queryBuilderService;
     private final DuplicateUserService duplicateUserService;
+    private final com.accsaber.backend.service.item.LevelUpAwardService levelUpAwardService;
+    private final ItemRepository itemRepository;
 
     public Page<MilestoneResponse> findAllActive(UUID setId, UUID categoryId, String type, Pageable pageable) {
         return findAllByStatus(setId, categoryId, type, MilestoneStatus.ACTIVE, pageable);
@@ -313,8 +316,32 @@ public class MilestoneService {
                 .title(request.getTitle())
                 .description(request.getDescription())
                 .setBonusXp(request.getSetBonusXp() != null ? request.getSetBonusXp() : BigDecimal.ZERO)
+                .awardsItem(loadItem(request.getAwardsItemId()))
                 .build();
         return toSetResponse(milestoneSetRepository.save(set), null);
+    }
+
+    @Transactional
+    public MilestoneSetResponse updateSet(UUID id,
+            com.accsaber.backend.model.dto.request.milestone.UpdateMilestoneSetRequest request) {
+        MilestoneSet set = milestoneSetRepository.findByIdAndActiveTrue(id)
+                .orElseThrow(() -> new ResourceNotFoundException("MilestoneSet", id));
+        if (request.getTitle() != null)
+            set.setTitle(request.getTitle());
+        if (request.getDescription() != null)
+            set.setDescription(request.getDescription());
+        if (request.getSetBonusXp() != null)
+            set.setSetBonusXp(request.getSetBonusXp());
+        if (request.getAwardsItemId() != null)
+            set.setAwardsItem(loadItem(request.getAwardsItemId()));
+        return toSetResponse(milestoneSetRepository.save(set), null);
+    }
+
+    private com.accsaber.backend.model.entity.item.Item loadItem(UUID itemId) {
+        if (itemId == null)
+            return null;
+        return itemRepository.findByIdAndActiveTrue(itemId)
+                .orElseThrow(() -> new ResourceNotFoundException("Item", itemId));
     }
 
     @Transactional
@@ -342,6 +369,7 @@ public class MilestoneService {
                 .targetValue(request.getTargetValue())
                 .comparison(request.getComparison() != null ? request.getComparison() : "GTE")
                 .blExclusive(request.isBlExclusive())
+                .awardsItem(loadItem(request.getAwardsItemId()))
                 .build();
         Milestone saved = milestoneRepository.save(milestone);
 
@@ -410,6 +438,9 @@ public class MilestoneService {
         if (request.getComparison() != null) {
             milestone.setComparison(request.getComparison());
         }
+        if (request.getAwardsItemId() != null) {
+            milestone.setAwardsItem(loadItem(request.getAwardsItemId()));
+        }
         Milestone saved = milestoneRepository.save(milestone);
         MilestoneCompletionStats stats = completionStatsRepository.findByMilestoneId(id).orElse(null);
         return toResponse(saved, stats);
@@ -441,7 +472,8 @@ public class MilestoneService {
         List<Long> userIds = userRepository.findByActiveTrue().stream()
                 .map(User::getId)
                 .toList();
-        log.info("Backfill started for milestone '{}' ({}) — {} users", milestone.getTitle(), milestoneId, userIds.size());
+        log.info("Backfill started for milestone '{}' ({}) — {} users", milestone.getTitle(), milestoneId,
+                userIds.size());
         int processed = 0;
         for (Long userId : userIds) {
             try {
@@ -451,10 +483,12 @@ public class MilestoneService {
             }
             processed++;
             if (processed % 10000 == 0) {
-                log.info("Backfill milestone '{}': {}/{} users processed", milestone.getTitle(), processed, userIds.size());
+                log.info("Backfill milestone '{}': {}/{} users processed", milestone.getTitle(), processed,
+                        userIds.size());
             }
         }
-        log.info("Backfill complete for milestone '{}' ({}) — {} users processed", milestone.getTitle(), milestoneId, processed);
+        log.info("Backfill complete for milestone '{}' ({}) — {} users processed", milestone.getTitle(), milestoneId,
+                processed);
     }
 
     @Async("taskExecutor")
@@ -476,10 +510,12 @@ public class MilestoneService {
             }
             processed++;
             if (processed % 10000 == 0) {
-                log.info("Bulk backfill: {}/{} users processed, {} milestones completed so far", processed, userIds.size(), totalCompleted);
+                log.info("Bulk backfill: {}/{} users processed, {} milestones completed so far", processed,
+                        userIds.size(), totalCompleted);
             }
         }
-        log.info("Bulk milestone backfill complete — {} users processed, {} milestones completed", processed, totalCompleted);
+        log.info("Bulk milestone backfill complete — {} users processed, {} milestones completed", processed,
+                totalCompleted);
     }
 
     private void awardMilestoneXp(Long userId, MilestoneEvaluationService.EvaluationResult evaluation) {
@@ -491,7 +527,7 @@ public class MilestoneService {
             xp = xp.add(s.getSetBonusXp() != null ? s.getSetBonusXp() : BigDecimal.ZERO);
         }
         if (xp.compareTo(BigDecimal.ZERO) > 0) {
-            userRepository.addXp(userId, xp);
+            levelUpAwardService.addXp(userId, xp);
         }
     }
 
@@ -727,6 +763,7 @@ public class MilestoneService {
                 .completionPercentage(stats != null ? stats.getCompletionPercentage() : BigDecimal.ZERO)
                 .completions(stats != null ? stats.getCompletions() : 0L)
                 .totalPlayers(stats != null ? stats.getTotalPlayers() : 0L)
+                .awardsItemId(m.getAwardsItem() != null ? m.getAwardsItem().getId() : null)
                 .createdAt(m.getCreatedAt())
                 .build();
     }
@@ -751,7 +788,8 @@ public class MilestoneService {
 
         if (userLink != null) {
             builder.userProgress(userLink.getProgress())
-                    .userNormalizedProgress(normalizeProgress(userLink.getProgress(), m.getTargetValue(), m.getComparison()))
+                    .userNormalizedProgress(
+                            normalizeProgress(userLink.getProgress(), m.getTargetValue(), m.getComparison()))
                     .userCompleted(userLink.isCompleted())
                     .userCompletedAt(userLink.getCompletedAt());
             Score score = userLink.getAchievedWithScore();
@@ -782,6 +820,7 @@ public class MilestoneService {
                 .title(s.getTitle())
                 .description(s.getDescription())
                 .setBonusXp(s.getSetBonusXp())
+                .awardsItemId(s.getAwardsItem() != null ? s.getAwardsItem().getId() : null)
                 .createdAt(s.getCreatedAt())
                 .userCompletionPercentage(userCompletionPercentage)
                 .build();

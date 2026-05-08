@@ -1,6 +1,7 @@
 package com.accsaber.backend.model.dto.request.milestone;
 
 import java.math.BigDecimal;
+import java.util.UUID;
 
 import com.accsaber.backend.model.dto.MilestoneQuerySpec;
 import com.accsaber.backend.model.entity.milestone.MilestoneTier;
@@ -23,4 +24,6 @@ public class UpdateMilestoneRequest {
     private BigDecimal targetValue;
 
     private String comparison;
+
+    private UUID awardsItemId;
 }
