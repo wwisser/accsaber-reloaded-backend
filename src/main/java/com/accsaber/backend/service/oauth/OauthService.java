@@ -104,16 +104,23 @@ public class OauthService {
 
     @Transactional
     public PlayerAuthResponse handleBeatLeaderCallback(String code, Long linkUserId, String pendingLinkToken) {
-        BeatLeaderIdentity identity = beatLeaderClient.exchangeCode(code);
+        return loginViaBeatLeader(beatLeaderClient.exchangeCode(code), linkUserId, pendingLinkToken);
+    }
+
+    @Transactional
+    public PlayerAuthResponse handleIngameTicket(String provider, String ticket) {
+        return loginViaBeatLeader(beatLeaderClient.verifyTicketAndFetchIdentity(provider, ticket), null, null);
+    }
+
+    private PlayerAuthResponse loginViaBeatLeader(BeatLeaderIdentity identity, Long linkUserId,
+            String pendingLinkToken) {
         long beatLeaderId;
         try {
             beatLeaderId = Long.parseLong(identity.getId());
         } catch (NumberFormatException e) {
             throw new UnauthorizedException("BeatLeader identity returned a non-numeric player id");
         }
-        Long userId = duplicateUserService.resolvePrimaryUserId(beatLeaderId);
-        User user = requireUser(userId);
-
+        User user = requireUser(duplicateUserService.resolvePrimaryUserId(beatLeaderId));
         return completeProviderLogin(user, PROVIDER_BEATLEADER, identity.getId(), identity.getName(),
                 identity.getAvatar(), linkUserId, pendingLinkToken);
     }

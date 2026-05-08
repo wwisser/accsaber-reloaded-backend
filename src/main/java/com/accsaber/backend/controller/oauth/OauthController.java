@@ -25,6 +25,7 @@ import com.accsaber.backend.exception.AccSaberException;
 import com.accsaber.backend.exception.UnauthorizedException;
 import com.accsaber.backend.exception.ValidationException;
 import com.accsaber.backend.model.dto.request.RefreshTokenRequest;
+import com.accsaber.backend.model.dto.request.auth.IngameAuthRequest;
 import com.accsaber.backend.model.dto.response.AuthMeResponse;
 import com.accsaber.backend.model.dto.response.PlayerAuthResponse;
 import com.accsaber.backend.security.PlayerUserDetails;
@@ -51,6 +52,8 @@ public class OauthController {
             OauthService.PROVIDER_DISCORD,
             OauthService.PROVIDER_BEATLEADER,
             OauthService.PROVIDER_STEAM);
+
+    private static final Set<String> INGAME_TICKET_PROVIDERS = Set.of("steamTicket", "oculusTicket");
 
     private final OauthService oauthService;
     private final OauthStateService stateService;
@@ -118,6 +121,15 @@ public class OauthController {
         } catch (AccSaberException e) {
             return redirectWithError(claims.returnTo(), e);
         }
+    }
+
+    @Operation(summary = "Authenticate a player from an in-game mod via a Steam or Oculus ticket")
+    @PostMapping("/ingame")
+    public ResponseEntity<PlayerAuthResponse> ingame(@Valid @RequestBody IngameAuthRequest request) {
+        if (!INGAME_TICKET_PROVIDERS.contains(request.getProvider())) {
+            throw new ValidationException("Unknown ticket provider: " + request.getProvider());
+        }
+        return ResponseEntity.ok(oauthService.handleIngameTicket(request.getProvider(), request.getTicket()));
     }
 
     @Operation(summary = "Refresh a player session")
