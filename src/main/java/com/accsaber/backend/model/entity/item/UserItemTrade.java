@@ -46,7 +46,7 @@ public class UserItemTrade {
     @JoinColumn(name = "to_user_id", nullable = false)
     private User toUser;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "user_item_link_id", nullable = false)
     private UserItemLink userItemLink;
 
